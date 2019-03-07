@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <title>Business Hours plugin for jQuery &ndash; Demos and Documentation</title>
+    <meta name="description" content="Business hours jQuery plugin."/>
+
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+    <script type="text/javascript" src="//netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+    <link href="//netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" rel="stylesheet">
+    <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css" rel="stylesheet">
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/jquery-json/2.4.0/jquery.json.min.js"></script>
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/jquery-timepicker/1.2.17/jquery.timepicker.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="//cdnjs.cloudflare.com/ajax/libs/jquery-timepicker/1.2.17/jquery.timepicker.min.css"/>
+
+    <link rel="stylesheet" type="text/css" href="style.css">
+    <link rel="stylesheet" type="text/css" href="//cdnjs.cloudflare.com/ajax/libs/rainbow/1.2.0/themes/github.css"/>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/rainbow/1.2.0/js/rainbow.min.js" type="text/javascript"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/rainbow/1.2.0/js/language/generic.js" type="text/javascript"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/rainbow/1.2.0/js/language/javascript.js" type="text/javascript"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/rainbow/1.2.0/js/language/html.js" type="text/javascript"></script>
+    
+    <script type="text/javascript" src="jquery.businessHours.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="jquery.businessHours.css"/>
+    <link rel="stylesheet" type="text/css" href="libs/page.css"/>
+
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/github-fork-ribbon-css/0.1.0/gh-fork-ribbon.min.css">
+    
+</head>
+<body>
+    <br>
+
+    <div id="businessHoursContainer1"></div>
+    <br>
+    <div style="float: right;width: 45%;">
+        
+    <textarea cols="50" rows="10" name="" id="businessHoursOutput"></textarea> 
+<button style="vertical-align: bottom;" id="get_array">save</button>
+    </div>
+</body>
+<script type="text/javascript">
+  
+
+(function($) {
+    $.fn.businessHours = function(opts) {
+        var defaults = {
+            preInit: function() {
+            },
+            postInit: function() {
+            },
+            checkedColorClass: "WorkingDayState",
+            uncheckedColorClass: "RestDayState",
+            colorBoxValContainerClass: "colorBoxContainer",
+            weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            operationTime: [
+                {},
+                {},
+                {},
+                {},
+                {},
+                {isActive: false},
+                {isActive: false}
+            ],
+            defaultOperationTimeFrom: '9:00',
+            defaultOperationTimeTill: '18:00',
+            defaultActive: true,
+            // labelOn: "Working day",
+            // labelOff: "Day off",
+            //labelTimeFrom: "from:",
+            //labelTimeTill: "till:",
+            containerTmpl: '<div class="clean"/>',
+            dayTmpl: '<div class="dayContainer">' +
+                '<div data-original-title="" class="colorBox"><input type="checkbox" class="invisible operationState"/></div>' +
+                '<div class="weekday"></div>' +
+                '<div class="operationDayTimeContainer">' +
+                '<div class="operationTime"><input type="text" name="startTime" class="mini-time operationTimeFrom" value=""/></div>' +
+                '<div class="operationTime"><input type="text" name="endTime" class="mini-time operationTimeTill" value=""/></div>' +
+                '</div></div>'
+        };
+
+        var container = $(this);
+        var methods = {
+            getValueOrDefault: function(val, defaultVal) {
+                return (jQuery.type(val) === "undefined" || val == null) ? defaultVal : val;
+            },
+            init: function(opts) {
+                this.options = $.extend(defaults, opts);
+                container.html("");
+
+                if(typeof this.options.preInit === "function") {
+                    this.options.preInit();
+                }
+
+                this.initView(this.options);
+
+                if(typeof this.options.postInit === "function") {
+                    //$('.operationTimeFrom, .operationTimeTill').timepicker(options.timepickerOptions);
+                    this.options.postInit();
+                }
+
+                return {
+                    serialize: function() {
+                        var data = [];
+
+                        container.find(".operationState").each(function(num, item) {
+                            var isWorkingDay = $(item).prop("checked");
+                            var dayContainer = $(item).parents(".dayContainer");
+                            var time_list = (dayContainer.find(".operationDayTimeContainer:first .operationTime").length-2)/2;
+                            var start_list = [];
+                            var end_list = [];
+                            for (var i = 0; i < time_list; i++) {
+                                if (i == 0) {
+                                    start_list.push(dayContainer.find("[name='startTime']").val());
+                                    end_list.push(dayContainer.find("[name='endTime']").val());
+
+                                }
+                                else
+                                {
+                                    start_list.push(dayContainer.find("[name='startTime_"+i+"']").val());
+                                    end_list.push(dayContainer.find("[name='endTime_"+i+"']").val());
+                                }
+                                
+                            }
+                            
+
+                            data.push({
+                                isActive: isWorkingDay,
+                                timeFrom: isWorkingDay ? start_list : null,
+                                timeTill: isWorkingDay ? end_list : null
+                            });
+                        });
+
+                        return data;
+                    },
+                    serializeObject: function() {
+                        var data = [];
+                        container.find(".operationState").each(function(num, item) {
+                            var isWorkingDay = $(item).prop("checked"),
+                                dayContainer = $(item).parents(".dayContainer"),
+                                dayName      = dayContainer.find('.weekday').text().toLowerCase();
+
+                            data[dayName + '_1_open'] = isWorkingDay ? dayContainer.find("[name='startTime']").val() : null;
+                            data[dayName + '_1_close'] = isWorkingDay ? dayContainer.find("[name='endTime']").val() : null;
+
+                            // generally remove all unwanted error classes
+                            container.find('.operationTime').removeClass('has-error');
+
+                            // Validation Start
+                            if (data[dayName + '_1_open'] && !data[dayName + '_1_close']) {
+                                data = [];
+
+                                // time to show some errors to the user
+                                container.find('[data-weekday="'+ dayName +'"]').parent()
+                                    .find('[name="endTime"]').parent()
+                                        .addClass('has-error');
+                                return false;
+                            }
+
+                            if (data[dayName + '_1_close'] && !data[dayName + '_1_open']) {
+                                data = [];
+
+                                // time to show some errors to the user
+                                container.find('[data-weekday="'+ dayName +'"]').parent()
+                                    .find('[name="startTime"]').parent()
+                                        .addClass('has-error');
+                                return false;
+                            }
+
+                            // Ignore the null value as it will be a day off
+                            if (!/^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/.test(data[dayName + '_1_close']) && data[dayName + '_1_close'] !== null ) {
+                                data = [];
+
+                                // time to show some errors to the user
+                                container.find('[data-weekday="'+ dayName +'"]').parent()
+                                    .find('[name="endTime"]').parent()
+                                        .addClass('has-error');
+                                return false;
+                            }
+
+                            // Ignore the null value as it will be a day off
+                            if (!/^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/.test(data[dayName + '_1_open']) && data[dayName + '_1_open'] !== null) {
+                                data = [];
+                                // time to show some errors to the user
+                                container.find('[data-weekday="'+ dayName +'"]').parent()
+                                    .find('[name="startTime"]').parent()
+                                        .addClass('has-error');
+                                return false;
+                            }
+
+
+                              // if the hidden class cannot be seen then add the secondary times as well
+                            if (!dayContainer.find('.operationTime.hidden').length) {
+                                data[dayName + '_2_open'] = isWorkingDay ? dayContainer.find("[name='startTime_1']").val() : null;
+                                data[dayName + '_2_close'] = isWorkingDay ? dayContainer.find("[name='endTime_1']").val() : null;
+
+
+                                if (data[dayName + '_2_open'] && !data[dayName + '_2_close']) {
+                                    data = [];
+
+                                    // time to show some errors to the user
+                                    container.find('[data-weekday="'+ dayName +'"]').parent()
+                                        .find('[name="endTime_1"]').parent()
+                                            .addClass('has-error');
+                                    return false;
+                                }
+
+                                if (data[dayName + '_2_close'] && !data[dayName + '_2_open']) {
+                                    data = [];
+
+                                    // time to show some errors to the user
+                                    container.find('[data-weekday="'+ dayName +'"]').parent()
+                                        .find('[name="startTime_1"]').parent()
+                                            .addClass('has-error');
+                                    return false;
+                                }
+
+                                // Ignore the null value as it will be a day off
+                                if (!/^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/.test(data[dayName + '_2_close']) && data[dayName + '_2_close'] !== null ) {
+                                    data = [];
+
+                                    // time to show some errors to the user
+                                    container.find('[data-weekday="'+ dayName +'"]').parent()
+                                        .find('[name="endTime_1"]').parent()
+                                            .addClass('has-error');
+                                    return false;
+                                }
+
+                                // Ignore the null value as it will be a day off
+                                if (!/^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/.test(data[dayName + '_2_open']) && data[dayName + '_2_open'] !== null) {
+                                    data = [];
+                                    // time to show some errors to the user
+                                    container.find('[data-weekday="'+ dayName +'"]').parent()
+                                        .find('[name="startTime_1"]').parent()
+                                            .addClass('has-error');
+                                    return false;
+                                }
+                            }
+
+                            // Validation End
+                        });
+                        return $.extend({}, data);
+                    }
+                };
+            },
+            initView: function(options) {
+                var stateClasses = [options.checkedColorClass, options.uncheckedColorClass];
+                var subContainer = container.append($(options.containerTmpl));
+                var $this = this;
+
+                for(var i = 0; i < options.weekdays.length; i++) {
+                    subContainer.append(options.dayTmpl);
+                }
+
+                $.each(options.weekdays, function(pos, weekday) {
+                    // populate form
+                    var day = options.operationTime[pos];
+                    var operationDayNode = container.find(".dayContainer").eq(pos);
+                    operationDayNode.find('.weekday').html(weekday);
+                    // this used to get a specific node using jquery
+                    operationDayNode.find('.weekday').attr('data-weekday', weekday.toLowerCase());
+
+                    var isWorkingDay = $this.getValueOrDefault(day.isActive, options.defaultActive);
+                    operationDayNode.find('.operationState').prop('checked', isWorkingDay);
+
+                    var timeFrom = $this.getValueOrDefault(day.timeFrom, options.defaultOperationTimeFrom);
+                    operationDayNode.find('[name="startTime"]').val(timeFrom);
+
+                    var endTime = $this.getValueOrDefault(day.timeTill, options.defaultOperationTimeTill);
+                    operationDayNode.find('[name="endTime"]').val(endTime);
+                });
+
+                container.find(".operationState").change(function() {
+                    var checkbox = $(this);
+                    var boxClass = options.checkedColorClass;
+                    var timeControlDisabled = false;
+
+                    if(!checkbox.prop("checked")) {
+                        // disabled
+                        boxClass = options.uncheckedColorClass;
+                        timeControlDisabled = true;
+                    }
+
+                    checkbox.parents(".colorBox").removeClass(stateClasses.join(' ')).addClass(boxClass);
+                    checkbox.parents(".dayContainer").find(".operationTime").toggle(!timeControlDisabled);
+                }).trigger("change");
+
+                container.find(".colorBox").on("click", function() {
+                    var checkbox = $(this).find(".operationState");
+                    checkbox.prop("checked", !checkbox.prop('checked')).trigger("change");
+                });
+
+                // add time slot button click event will show the additional time slot
+                container.find('.addTimeSlot').on('click', function(e) {
+                    e.preventDefault();
+                    var $that = $(this);
+                        var hide_input = ($that.parent().find(".operationTime").length-2)/2;
+                        hidden_startTime = "startTime_"+hide_input;
+                        hidden_endTime = "endTime_"+hide_input;
+
+                        new_input_count = ($that.parent().find(".operationTime").length-2)/2+1;
+                        new_hidden_startTime = "startTime_"+new_input_count;
+                        new_hidden_endTime = "endTime_"+new_input_count;
+
+                        $secondTimeSlot = $that.parent().find('[name="'+hidden_startTime+'"], [name="'+hidden_endTime+'"]').parent();
+
+                    $secondTimeSlot.removeClass('hidden');
+                    if ($secondTimeSlot.is(':visible')) {
+                        $secondTimeSlot.parent().append('<div class="operationTime input-group hidden" style="display: table;"><span style="width: 80px;" class="input-group-addon"><i class="fa fa-sun-o"></i></span><input type="text" name="'+new_hidden_startTime+'" id="'+new_hidden_startTime+'" class="mini-time form-control 1 operationTimeFrom" value=""></div>' +
+                        '<div class="operationTime input-group hidden" style="display: table;"><span class="input-group-addon"><i class="fa fa-moon-o"></i></span><input type="text" name="'+new_hidden_endTime+'" id="'+new_hidden_endTime+'" class="mini-time form-control operationTimeTill" value=""></div></div>');
+                    }
+                });
+            }
+        };
+        return methods.init(opts);
+    };
+})(jQuery);
+
+                        
+
+ businessHoursManager = $("#businessHoursContainer1").businessHours({
+                    postInit:function(){
+                        $(document).on("focus", "input", function()
+                        {
+                            var datePicker = $(this).attr("id");
+                            $('input[id="'+$(this).attr("id")+'"]').timepicker({
+                                'timeFormat': 'H:i',
+                                'step': 30
+                            });
+
+                            $('input[id="'+$(this).attr("id")+'"]').on('changeTime hideTimepicker', function() {
+                                var $that = $(this);
+                                if ($that.val() && /^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/.test( $that.val() )) {
+                                    $that.parent().removeClass('has-error');
+                                } else {
+                                    $that.parent().addClass('has-error');
+                                }
+                            });
+                            $('input[id="'+$(this).attr("id")+'"]').on('timeFormatError timeRangeError', function() {
+                                var $that = $(this);
+                                $that.parent().addClass('has-error');
+                                $that.focus();
+                            });
+                        });
+
+                    },
+                    dayTmpl:'<div class="dayContainer" style="width: 80px;">' +
+                        '<div data-original-title="" class="colorBox"><input type="checkbox" class="invisible operationState"></div>' +
+                        '<div class="weekday"></div>' +
+                        '<div class="operationDayTimeContainer">' +
+                        '<div class="operationTime input-group"><span class="input-group-addon"><i class="fa fa-sun-o"></i></span><input type="text" name="startTime" id="startTime" class="mini-time form-control operationTimeFrom" value=""></div>' +
+                        '<div class="operationTime input-group"><span class="input-group-addon"><i class="fa fa-moon-o"></i></span><input type="text" name="endTime" id="endTime"  class="mini-time form-control operationTimeTill" value=""></div>' +
+                        '<div class="operationTime input-group hidden" style="display: table;"><span style="width: 80px;" class="input-group-addon"><i class="fa fa-sun-o"></i></span><input type="text" name="startTime_1" id="startTime_1" class="mini-time form-control operationTimeFrom" value=""></div>' +
+                        '<div class="operationTime input-group hidden" style="display: table;"><span class="input-group-addon"><i class="fa fa-moon-o"></i></span><input type="text" name="endTime_1" id="endTime_1" class="mini-time form-control operationTimeTill" value=""></div>' +
+                        '</div><a class="btn btn-default btn-sm addTimeSlot"><span class="fa fa-plus-square"></span> Add</a></div>'
+                });
+
+                $(document).on("click", "#get_array", function() {
+                    // use: businessHoursManager.serialize() to get serialized business hours in JSON
+                    $("#businessHoursOutput").val(JSON.stringify(businessHoursManager.serialize()));
+                });
+
+</script>
+
+</html>
